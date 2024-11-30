@@ -1,4 +1,4 @@
-3 models: Not uploaded coz of large size
+models: Not uploaded coz of large size
 1. yovo5_best.pt
 2. yovo5_last.pt
 3. keypoints_model.pth
