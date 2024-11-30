@@ -3,12 +3,14 @@
 ## Introduction
 This project develops a tennis analysis system using computer vision and machine learning techniques to analyze tennis matches. The system detects and tracks players, tennis balls, and key points on the court. It also calculates player speed, ball shot speed, and measures player coverage during the match. Additionally, it determines if the ball lands in or out of the court.
 
-## Output Video
+## Output Video 
 Once the analysis is complete, the output video will be saved as output_video.avi. You can view the sample output video here:
 
- ```markdown
-  [Sample Output Video](./output_videos/output_video.avi)
- ```
+
+
+https://github.com/user-attachments/assets/ab74642a-2a28-4839-b689-8a3e08fd4e0c
+
+
 
 ## Models Used
 The project uses the following models:
