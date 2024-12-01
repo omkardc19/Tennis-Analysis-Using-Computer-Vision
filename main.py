@@ -1,9 +1,10 @@
-from utils import (read_video, 
-                   save_video,
-                   measure_distance,
-                   draw_player_stats,
-                   convert_pixel_distance_to_meters
+from utils import (read_video,                          # Reads video frames from a file.
+                   save_video,                          # Saves processed frames as an output video.
+                   measure_distance,                    # Computes the Euclidean distance between two points.
+                   draw_player_stats,                   # Annotates video frames with player statistics.
+                   convert_pixel_distance_to_meters     # Converts pixel distances to meters using court dimensions.
                    )
+# imports
 import constants
 from trackers import PlayerTracker,BallTracker
 from court_line_detector import CourtLineDetector
@@ -16,47 +17,53 @@ from copy import deepcopy
 
 def main():
     # Read Video
-    input_video_path = "input/input_video.mp4"
-    video_frames = read_video(input_video_path)
+    input_video_path = "input/input_video.mp4"    # Specifies the input video file.
+    video_frames = read_video(input_video_path)   # Reads video frames using read_video.
 
-    if not video_frames:
+    if not video_frames:              # Exits with an error message if no frames are read.
         print("Error: video_frames is empty.")
         return
 
     # Detect Players and Ball
-    player_tracker = PlayerTracker(model_path='yolov8x')
-    ball_tracker = BallTracker(model_path='models/yolo5_last.pt')
+    player_tracker = PlayerTracker(model_path='yolov8x')  # Initializes PlayerTracker with YOLOv8 for tracking players.
+    ball_tracker = BallTracker(model_path='models/yolo5_last.pt') # Initializes BallTracker with finetuned YOLOv5 for tracking the ball.
 
+
+    # Reads precomputed player and ball detections from stub files for faster processing.
+    # If read_from_stub=False, performs fresh detection.
     player_detections = player_tracker.detect_frames(video_frames,
                                                      read_from_stub=True,    # Set to False to re-run the detection
                                                      stub_path="tracker_stubs/player_detections.pkl"
                                                      )
     ball_detections = ball_tracker.detect_frames(video_frames,
                                                      read_from_stub=True,     # Set to False to re-run the detection
-                                                     stub_path="tracker_stubs/ball_detections.pkl"
-                                                     )
+                                                     stub_path="tracker_stubs/ball_detections.pkl")
+    
+    # Interpolates missing ball detections for smoother tracking across frames.                                                 )
     ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
     
     
-    # Court Line Detector model
+    # Initializes CourtLineDetector with the path to a custom-trained keypoint detection model.
     court_model_path = "models/keypoints_model.pth"
+    # Extracts court keypoints from the first video frame.
     court_line_detector = CourtLineDetector(court_model_path)
     court_keypoints = court_line_detector.predict(video_frames[0])
 
     # choose players
+    # Filters and refines player detections based on their positions relative to the court
     player_detections = player_tracker.choose_and_filter_players(court_keypoints, player_detections)
 
-    # MiniCourt
+    # Initializes a MiniCourt instance using the first video frame for scaling and visualization.
     mini_court = MiniCourt(video_frames[0]) 
 
-    # Detect ball shots
+    # Identifies frames where a ball shot occurs based on significant ball movement.
     ball_shot_frames= ball_tracker.get_ball_shot_frames(ball_detections)
 
-    # Convert positions to mini court positions
+    # Converts bounding box coordinates to scaled mini-court coordinates for better visual representation.
     player_mini_court_detections, ball_mini_court_detections = mini_court.convert_bounding_boxes_to_mini_court_coordinates(player_detections, 
                                                                                                           ball_detections,
                                                                                                           court_keypoints)
-
+    # Initializes a dictionary to store player stats (e.g., shot count, speeds) for each frame.
     player_stats_data = [{
         'frame_num':0,
         'player_1_number_of_shots':0,
@@ -71,7 +78,13 @@ def main():
         'player_2_total_player_speed':0,
         'player_2_last_player_speed':0,
     } ]
-    
+
+
+    # # For each ball shot, calculates:
+    #     Ball speed based on distance covered and frame rate.
+    #     Player who hit the ball based on proximity.
+    #     Opponent's movement speed during the interval.
+    #     Updates cumulative player stats.
     for ball_shot_ind in range(len(ball_shot_frames)-1):
         start_frame = ball_shot_frames[ball_shot_ind]
         end_frame = ball_shot_frames[ball_shot_ind+1]
@@ -115,10 +128,11 @@ def main():
 
         player_stats_data.append(current_player_stats)
 
+    # Converts player stats into a structured DataFrame for easy analysis and visualization.
     player_stats_data_df = pd.DataFrame(player_stats_data)
     frames_df = pd.DataFrame({'frame_num': list(range(len(video_frames)))})
     player_stats_data_df = pd.merge(frames_df, player_stats_data_df, on='frame_num', how='left')
-    player_stats_data_df = player_stats_data_df.ffill()
+    player_stats_data_df = player_stats_data_df.ffill() #Ensures missing data in frames is carried forward.
 
     player_stats_data_df['player_1_average_shot_speed'] = player_stats_data_df['player_1_total_shot_speed']/player_stats_data_df['player_1_number_of_shots']
     player_stats_data_df['player_2_average_shot_speed'] = player_stats_data_df['player_2_total_shot_speed']/player_stats_data_df['player_2_number_of_shots']
